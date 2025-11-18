@@ -93,6 +93,29 @@ const menuItems = [
     ],
   },
   {
+    title: "AI TOOLS",
+    items: [
+      {
+        icon: "/brain.png",
+        label: "AI Playground",
+        href: "/admin/playground",
+        visible: ["admin"],
+      },
+      {
+        icon: "/brain.png",
+        label: "AI Playground",
+        href: "/teacher/playground",
+        visible: ["teacher"],
+      },
+      {
+        icon: "/brain.png",
+        label: "AI Playground",
+        href: "/student/playground",
+        visible: ["student"],
+      },
+    ],
+  },
+  {
     title: "OTHER",
     items: [
       {
