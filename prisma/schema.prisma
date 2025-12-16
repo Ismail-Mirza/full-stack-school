@@ -191,3 +191,169 @@ enum Day {
   THURSDAY
   FRIDAY
 }
+
+// ============================================
+// AI PLAYGROUND - RAG SYSTEM MODELS
+// ============================================
+
+// Document storage for RAG knowledge base
+model AIDocument {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  fileUrl     String?  // Cloudinary URL
+  fileType    String   // pdf, docx, txt, md, etc.
+  subject     String?  // math, physics, chemistry, etc.
+  gradeLevel  Int?     // 1-12
+  uploadedBy  String   // Clerk user ID
+  uploadedByRole String // teacher, admin
+  isPublic    Boolean  @default(true) // visible to students
+  metadata    Json?    // custom metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chunks      AIDocumentChunk[]
+  classId     Int?
+  class       Class?   @relation(fields: [classId], references: [id])
+  subjectId   Int?
+  subject_rel Subject? @relation(fields: [subjectId], references: [id])
+
+  @@index([subject, gradeLevel])
+  @@index([uploadedBy])
+}
+
+// Chunked documents with embeddings for vector search
+model AIDocumentChunk {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    AIDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content     String   @db.Text
+  embedding   String?  @db.Text // JSON stringified vector
+  chunkIndex  Int
+  metadata    Json?    // page number, section, etc.
+  createdAt   DateTime @default(now())
+
+  @@index([documentId])
+}
+
+// Conversation sessions
+model AIConversation {
+  id              String   @id @default(cuid())
+  userId          String   // Clerk user ID
+  userRole        String   // teacher, student
+  title           String
+  mode            String   // research, math_solver, physics_solver, chemistry_solver, quiz_creator, exam_creator
+  subject         String?
+  gradeLevel      Int?
+  isActive        Boolean  @default(true)
+  metadata        Json?    // context, settings
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  messages        AIMessage[]
+  feedback        AIFeedback[]
+  generatedContent AIGeneratedContent[]
+
+  @@index([userId, isActive])
+  @@index([mode, subject])
+}
+
+// Individual messages in conversation
+model AIMessage {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role            String   // user, assistant, system, tool
+  content         String   @db.Text
+  toolCalls       Json?    // function calls, tool usage
+  retrievedDocs   Json?    // documents used in RAG
+  confidence      Float?   // model confidence score
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  feedback        AIFeedback[]
+
+  @@index([conversationId])
+}
+
+// Self-learning feedback system
+model AIFeedback {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId       String?
+  message         AIMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId          String
+  feedbackType    String   // thumbs_up, thumbs_down, correction, rating
+  rating          Int?     // 1-5
+  comment         String?  @db.Text
+  correctedAnswer String?  @db.Text
+  wasUsedForLearning Boolean @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([feedbackType, wasUsedForLearning])
+}
+
+// Generated content (slides, posters, quizzes, exams)
+model AIGeneratedContent {
+  id              String   @id @default(cuid())
+  conversationId  String?
+  conversation    AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  createdBy       String   // Clerk user ID
+  type            String   // slide, poster, quiz, exam
+  title           String
+  content         Json     // structured content
+  format          String?  // pdf, pptx, png, json
+  fileUrl         String?  // exported file URL
+  subject         String?
+  gradeLevel      Int?
+  difficulty      String?  // easy, medium, hard
+  metadata        Json?
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Link to exam system for teacher-created quizzes
+  examId          Int?     @unique
+  exam            Exam?    @relation(fields: [examId], references: [id])
+
+  @@index([createdBy, type])
+  @@index([subject, gradeLevel])
+}
+
+// Analytics for self-learning improvements
+model AIAnalytics {
+  id              String   @id @default(cuid())
+  userId          String?
+  eventType       String   // query, retrieval, generation, feedback
+  subject         String?
+  mode            String?
+  queryText       String?  @db.Text
+  documentsRetrieved Int?
+  responseTime    Int?     // milliseconds
+  tokenUsage      Int?
+  success         Boolean  @default(true)
+  errorMessage    String?  @db.Text
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+}
+
+// Query refinement for self-learning
+model AIQueryRefinement {
+  id              String   @id @default(cuid())
+  originalQuery   String   @db.Text
+  refinedQuery    String   @db.Text
+  subject         String?
+  mode            String
+  improvementScore Float?  // how much better the refined query performed
+  usageCount      Int      @default(0)
+  lastUsed        DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([subject, mode])
+  @@index([usageCount])
+}
